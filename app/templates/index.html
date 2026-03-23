@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="DockView — Zero-config Docker database viewer" />
+  <title>DockView</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="/static/css/main.css" />
+</head>
+<body>
+
+<!-- App Shell -->
+<div id="app">
+
+  <!-- Top Bar -->
+  <header id="topbar">
+    <div class="topbar-left">
+      <div class="logo">
+        <span class="logo-icon">⬡</span>
+        <span class="logo-text">DockView</span>
+        <span class="logo-badge">v1.0</span>
+      </div>
+    </div>
+    <div class="topbar-center">
+      <div id="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="global-search" placeholder="Search databases, tables..." autocomplete="off" />
+        <kbd>⌘K</kbd>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div id="docker-status" class="status-pill">
+        <span class="status-dot"></span>
+        <span class="status-label">Connecting…</span>
+      </div>
+      <button class="icon-btn" id="refresh-btn" title="Refresh containers">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+      <button class="icon-btn" id="theme-btn" title="Toggle theme">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <div id="workspace">
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-header">
+          <span>DATABASES</span>
+          <span id="db-count" class="count-badge">0</span>
+        </div>
+        <div id="db-list" class="db-list">
+          <div class="empty-state-sidebar">
+            <div class="spinner"></div>
+            <span>Scanning containers…</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Panel -->
+    <main id="main-panel">
+      <!-- Welcome / empty state -->
+      <div id="welcome-screen" class="welcome-screen">
+        <div class="welcome-inner">
+          <div class="welcome-logo">⬡</div>
+          <h1 class="welcome-title">DockView</h1>
+          <p class="welcome-sub">Zero-config Docker database explorer</p>
+          <div class="welcome-steps">
+            <div class="step">
+              <div class="step-num">01</div>
+              <div class="step-text">
+                <strong>Run DockView</strong>
+                <span>alongside your Docker containers</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">02</div>
+              <div class="step-text">
+                <strong>Auto-detected</strong>
+                <span>Postgres, MySQL, Mongo, Redis</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">03</div>
+              <div class="step-text">
+                <strong>Browse instantly</strong>
+                <span>Tables, schemas, row previews</span>
+              </div>
+            </div>
+          </div>
+          <div id="no-docker-warning" class="warning-card hidden">
+            <span class="warning-icon">⚠</span>
+            <div>
+              <strong>Docker socket not available</strong>
+              <p>Mount the socket: <code>-v /var/run/docker.sock:/var/run/docker.sock</code></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DB Detail Panel (hidden until DB selected) -->
+      <div id="db-panel" class="db-panel hidden">
+
+        <!-- DB Header -->
+        <div class="db-header">
+          <div class="db-header-left">
+            <div class="db-badge" id="panel-db-badge"></div>
+            <div class="db-header-info">
+              <h2 id="panel-db-name"></h2>
+              <span id="panel-db-meta"></span>
+            </div>
+          </div>
+          <div class="db-header-actions">
+            <button class="btn-ghost" id="panel-reconnect-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+              Reconnect
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs-bar">
+          <button class="tab active" data-tab="explorer">Explorer</button>
+          <button class="tab" data-tab="schema">Schema</button>
+          <button class="tab" data-tab="info">Server Info</button>
+        </div>
+
+        <!-- Explorer Tab -->
+        <div class="tab-content active" id="tab-explorer">
+          <div class="explorer-layout">
+            <!-- Schema/DB picker -->
+            <div class="schema-panel">
+              <div class="schema-header">Schemas / Databases</div>
+              <div id="schema-list" class="schema-list">
+                <div class="mini-spinner"></div>
+              </div>
+            </div>
+
+            <!-- Table list -->
+            <div class="table-panel">
+              <div class="table-panel-header">
+                <span id="table-panel-title">Tables</span>
+                <span id="table-count" class="count-badge"></span>
+              </div>
+              <div id="table-list" class="table-list">
+                <div class="empty-hint">← Select a schema</div>
+              </div>
+            </div>
+
+            <!-- Data preview -->
+            <div class="data-panel" id="data-panel">
+              <div class="data-panel-header">
+                <div class="data-panel-title">
+                  <span id="data-panel-table-name">No table selected</span>
+                  <span id="data-row-count" class="row-count-badge"></span>
+                </div>
+                <div class="data-panel-actions">
+                  <button class="btn-ghost" id="btn-copy-csv" title="Copy as CSV">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+                    CSV
+                  </button>
+                  <div class="pagination-ctrl">
+                    <button class="pg-btn" id="pg-prev" disabled>‹</button>
+                    <span id="pg-info">—</span>
+                    <button class="pg-btn" id="pg-next" disabled>›</button>
+                  </div>
+                </div>
+              </div>
+              <div id="data-table-wrap" class="data-table-wrap">
+                <div class="select-table-hint">
+                  <span>Select a table to preview data</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schema Tab -->
+        <div class="tab-content" id="tab-schema">
+          <div id="schema-view-wrap" class="schema-view-wrap">
+            <div class="empty-hint">Select a table from Explorer first</div>
+          </div>
+        </div>
+
+        <!-- Info Tab -->
+        <div class="tab-content" id="tab-info">
+          <div id="server-info-wrap" class="server-info-wrap">
+            <div class="mini-spinner"></div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+</div>
+
+<!-- Credential Modal -->
+<div id="cred-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Connection Credentials</h3>
+      <button class="modal-close" id="cred-modal-close">✕</button>
+    </div>
+    <p class="modal-desc">Auto-detection failed. Enter credentials manually.</p>
+    <div class="modal-fields">
+      <label>Host <input type="text" id="cred-host" placeholder="localhost" /></label>
+      <label>Port <input type="number" id="cred-port" placeholder="5432" /></label>
+      <label>User <input type="text" id="cred-user" placeholder="postgres" /></label>
+      <label>Password <input type="password" id="cred-pass" placeholder="••••••••" /></label>
+      <label>Database <input type="text" id="cred-db" placeholder="mydb" /></label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" id="cred-cancel">Cancel</button>
+      <button class="btn-primary" id="cred-save">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toasts"></div>
+
+<script src="/static/js/app.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────
+# DockView — Docker Compose
+# Run DockView alongside example databases for development/demo
+# ─────────────────────────────────────────────────────────────
+
+services:
+
+  # ── DockView App ────────────────────────────────────────────
+  dockview:
+    build: .
+    image: dockview:latest
+    container_name: dockview
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - mysql
+      - mongo
+      - redis
+    networks:
+      - dockview-net
+
+  # ── PostgreSQL ───────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: demo-postgres
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    networks:
+      - dockview-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d appdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MySQL ────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: demo-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: shopdb
+      MYSQL_USER: shopuser
+      MYSQL_PASSWORD: shoppass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - dockview-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MongoDB ──────────────────────────────────────────────────
+  mongo:
+    image: mongo:7.0
+    container_name: demo-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: mongosecret
+      MONGO_INITDB_DATABASE: catalog
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - dockview-net
+
+  # ── Redis ────────────────────────────────────────────────────
+  redis:
+    image: redis:7.4-alpine
+    container_name: demo-redis
+    command: redis-server --requirepass redispass
+    ports:
+      - "6379:6379"
+    networks:
+      - dockview-net
+
+networks:
+  dockview-net:
+    driver: bridge
+
+volumes:
+  pg-data:
+  mysql-data:
+  mongo-data:

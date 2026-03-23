@@ -1,0 +1,30 @@
+# DockView — Python Dependencies
+# Python 3.11+
+
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# Templating
+jinja2==3.1.4
+
+# Docker SDK
+docker==7.1.0
+
+# Database drivers (async)
+asyncpg==0.30.0          # PostgreSQL
+aiomysql==0.2.0          # MySQL / MariaDB
+motor==3.6.0             # MongoDB (async wrapper)
+redis[asyncio]==5.2.1    # Redis
+
+# Data validation
+pydantic==2.10.3
+
+# Utilities
+python-multipart==0.0.20
+httpx==0.28.1
+
+# Dev / testing (optional)
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1
