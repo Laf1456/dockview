@@ -278,4 +278,5 @@ MIT © Levi Chinecherem. See [LICENSE](LICENSE) for details.
 
 ---
 
+## ⭐ If this helped you, consider starring the repo
 **Built with FastAPI, HTMX, and ❤️**

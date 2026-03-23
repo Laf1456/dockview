@@ -21,3 +21,5 @@ build/
 node_modules/
 *.log
 GUIDE.md
+Dockerfile
+docker-compose.yml
