@@ -4,7 +4,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-7c6cf0)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
-![License](https://img.shields.io/github/license/0xSemantic/dockview)
+![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ed)
 ![Docker Pulls](https://img.shields.io/docker/pulls/levichinecherem/dockview?color=2496ed&label=pulls&logo=docker)
 ![Docker Image Size](https://img.shields.io/docker/image-size/levichinecherem/dockview/latest?label=image%20size&logo=docker)
