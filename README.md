@@ -10,6 +10,10 @@
 ![Docker Image Size](https://img.shields.io/docker/image-size/levichinecherem/dockview/latest?label=image%20size&logo=docker)
 ![GitHub stars](https://img.shields.io/github/stars/0xSemantic/dockview?style=social)
 ![Last Commit](https://img.shields.io/github/last-commit/0xSemantic/dockview)
+[![Twitter Follow](https://img.shields.io/twitter/follow/0xSemantic?style=social)](https://twitter.com/0xSemantic)
+[![Medium](https://img.shields.io/badge/Medium-0xSemantic-black?logo=medium)](https://medium.com/@0xSemantic)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0xSemantic-blue?logo=linkedin)](https://www.linkedin.com/in/0xSemantic/)
+
 
 ---
 
