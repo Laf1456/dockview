@@ -22,10 +22,10 @@ DockView is a **single-container tool** that mounts the Docker socket, scans all
 ```bash
 docker run -d \
   -p 8080:8080 \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock:rw \
   --name dockview \
-  --restart unless-stopped \
-  dockview:latest
+  --user root \
+  levichinecherem/dockview:latest
 ```
 
 Open `http://localhost:8080` — done.
@@ -52,30 +52,136 @@ Open `http://localhost:8080` — done.
 
 ## Quick Start
 
-### Option 1 — Docker run (recommended)
+Here’s a **complete Quick Start** replacement for DockView with a ready-to-use **Docker Compose example** that users can copy locally and run immediately. This focuses **only on Quick Start**, with auto-detection notes included.
 
-```bash
-docker run -d \
-  --name dockview \
-  -p 8080:8080 \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  --restart unless-stopped \
-  levichinecherem/dockview:latest
+---
+
+### Option 1 — Docker Compose (recommended for auto-detection)
+
+Create a file named `docker-compose.yml` in an empty directory with the following content:
+
+```yaml
+services:
+  # ── DockView App ───────────────────────────────
+  dockview:
+    image: levichinecherem/dockview:latest
+    container_name: dockview
+    user: root   # ← run as root
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - mysql
+      - mongo
+      - redis
+    networks:
+      - dockview-net
+
+  # ── PostgreSQL ────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: demo-postgres
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    networks:
+      - dockview-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d appdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MySQL ────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: demo-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: shopdb
+      MYSQL_USER: shopuser
+      MYSQL_PASSWORD: shoppass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - dockview-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MongoDB ──────────────────────────────────
+  mongo:
+    image: mongo:7.0
+    container_name: demo-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: mongosecret
+      MONGO_INITDB_DATABASE: catalog
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - dockview-net
+
+  # ── Redis ────────────────────────────────────
+  redis:
+    image: redis:7.4-alpine
+    container_name: demo-redis
+    command: redis-server --requirepass redispass
+    ports:
+      - "6379:6379"
+    networks:
+      - dockview-net
+
+networks:
+  dockview-net:
+    driver: bridge
+
+volumes:
+  pg-data:
+  mysql-data:
+  mongo-data:
 ```
 
-Access the UI at [http://localhost:8080](http://localhost:8080).
-
-> **Note:** The `:ro` flag mounts the Docker socket read‑only – DockView cannot start or modify containers, only inspect them.
-
-### Option 2 — Docker Compose (with demo databases)
+Then run:
 
 ```bash
-git clone https://github.com/0xSemantic/dockview.git
-cd dockview
 docker-compose up -d
 ```
 
-This spins up DockView plus demo containers for PostgreSQL, MySQL, MongoDB, and Redis. Explore them immediately.
+Open the UI at [http://localhost:8080](http://localhost:8080).
+
+> ✅ DockView will **auto-detect the credentials** for all database containers because it shares the same Docker network and can read their environment variables.
+
+---
+
+### Option 2 — Standalone Docker run (manual credentials fallback)
+
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -v /var/run/docker.sock:/var/run/docker.sock:rw \
+  --name dockview \
+  --user root \
+  levichinecherem/dockview:latest
+```
+
+> **Note:** Auto-detection may **not work** in standalone mode. Use the **Reconnect modal** in the UI to enter credentials manually.
+
+---
 
 ### Option 3 — Local development
 
@@ -94,6 +200,7 @@ pip install -r requirements.txt
 # Run with hot reload
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 ```
+
 
 ---
 

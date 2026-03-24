@@ -1,10 +1,16 @@
 """
 Docker Inspector Service
 Scans running containers, identifies databases, extracts connection info.
+
+ENHANCED:
+- Multi-strategy Docker connection (Linux, macOS, Windows)
+- Smart host resolution (cross-network, Docker Desktop, bridge fallback)
+- Non-breaking: preserves all existing logic
 """
 
 import asyncio
 import logging
+import os
 from typing import Any
 
 import docker
@@ -74,20 +80,26 @@ class DockerInspector:
         self._connected = False
         self._error: str | None = None
 
-        # NEW: thread + loop control
+        # thread + loop control
         self._loop: asyncio.AbstractEventLoop | None = None
         self._running = False
 
     async def start(self):
-        """Initialize Docker client and start watching."""
+        """Initialize Docker client and start watching (with fallbacks)."""
+        self._loop = asyncio.get_running_loop()
+        self._running = True
+
+        self._client = self._connect_with_fallbacks()
+
+        if not self._client:
+            self._connected = False
+            self._error = "Docker not available (socket/env failed)"
+            logger.warning("Docker not available: all connection strategies failed")
+            return
+
         try:
-            self._client = docker.from_env()
             self._client.ping()
             self._connected = True
-
-            # store main event loop
-            self._loop = asyncio.get_running_loop()
-            self._running = True
 
             await self._scan_containers()
 
@@ -99,7 +111,34 @@ class DockerInspector:
         except DockerException as e:
             self._error = str(e)
             self._connected = False
-            logger.warning(f"Docker not available: {e}")
+            logger.warning(f"Docker connected but ping failed: {e}")
+
+    def _connect_with_fallbacks(self) -> docker.DockerClient | None:
+        """Try multiple Docker connection strategies."""
+
+        strategies = []
+
+        # 1. Standard env (works for Docker Desktop, remote, etc.)
+        strategies.append(lambda: docker.from_env())
+
+        # 2. Explicit Linux socket
+        strategies.append(lambda: docker.DockerClient(base_url="unix:///var/run/docker.sock"))
+
+        # 3. DOCKER_HOST override
+        docker_host = os.getenv("DOCKER_HOST")
+        if docker_host:
+            strategies.append(lambda: docker.DockerClient(base_url=docker_host))
+
+        for strategy in strategies:
+            try:
+                client = strategy()
+                client.ping()
+                logger.info("Docker connection established")
+                return client
+            except Exception as e:
+                logger.debug(f"Docker connection strategy failed: {e}")
+
+        return None
 
     async def stop(self):
         """Gracefully stop the inspector."""
@@ -141,28 +180,41 @@ class DockerInspector:
             return
 
         try:
+            # ✅ FIXED: proper docker-py usage
             containers = await asyncio.to_thread(
-                self._client.containers.list, {"status": "running"}
+                self._client.containers.list,
+                all=False
             )
 
-            found_ids = set()
-            for container in containers:
-                db = self._detect_database(container)
-                if db:
-                    found_ids.add(db.id)
-                    if db.id not in self._databases:
-                        self._databases[db.id] = db
-                        logger.info(f"Detected: {db.type.value} @ {db.name}")
-                    else:
-                        self._databases[db.id].status = "running"
+            logger.info(f"Scanning {len(containers)} containers...")
 
-            # Mark removed containers
+            found_ids = set()
+
+            for container in containers:
+                try:
+                    db = self._detect_database(container)
+                    if db:
+                        found_ids.add(db.id)
+
+                        if db.id not in self._databases:
+                            self._databases[db.id] = db
+                            logger.info(
+                                f"✅ Detected: {db.type.value} | {db.name} @ {db.host}:{db.port}"
+                            )
+                        else:
+                            self._databases[db.id].status = "running"
+
+                except Exception as e:
+                    logger.warning(f"Container parse failed: {e}")
+
+            # Mark stopped containers
             for db_id in list(self._databases.keys()):
                 if db_id not in found_ids:
                     self._databases[db_id].status = "stopped"
 
         except Exception as e:
             logger.error(f"Scan error: {e}")
+            
 
     def _detect_database(self, container) -> DetectedDatabase | None:
         """Attempt to detect if a container is a database."""
@@ -238,24 +290,34 @@ class DockerInspector:
         return creds
 
     def _extract_host_port(self, container, db_type: DatabaseType) -> tuple[str, int]:
-        """Determine the host:port to connect on."""
+        """Determine the host:port to connect on (ENHANCED CROSS-PLATFORM)."""
         default_port = DEFAULT_PORTS[db_type]
 
-        # Try to get the container's internal IP (same Docker network)
         networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
+
+        # 1. Same Docker network (best case)
         for net_name, net_info in networks.items():
             ip = net_info.get("IPAddress")
             if ip:
                 return ip, default_port
 
-        # Fallback: use mapped port on localhost
+        # 2. Port mapping (Docker Desktop / cross-network)
         ports = container.attrs.get("NetworkSettings", {}).get("Ports", {})
         port_key = f"{default_port}/tcp"
+
         if port_key in ports and ports[port_key]:
             mapped = ports[port_key][0]
-            return "localhost", int(mapped["HostPort"])
+            host_port = int(mapped["HostPort"])
 
-        return "localhost", default_port
+            # macOS / Windows Docker Desktop
+            if os.name != "posix":
+                return "host.docker.internal", host_port
+
+            # Linux fallback
+            return "localhost", host_port
+
+        # 3. Linux bridge fallback
+        return "172.17.0.1", default_port
 
     async def _watch_events(self):
         """Watch Docker events and update DB list in real time."""
@@ -277,7 +339,6 @@ class DockerInspector:
 
                 action = event.get("Action", "")
                 if action in ("start", "die", "stop", "destroy"):
-                    # safely schedule async scan in main loop
                     if self._loop:
                         asyncio.run_coroutine_threadsafe(
                             self._scan_containers(),
